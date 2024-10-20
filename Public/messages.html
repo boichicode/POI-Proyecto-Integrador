@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Interface</title>
+    <link href="stylesmessage.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <input id="search-input" placeholder="Buscar Usuarios" type="text"/>
+            <ul id="chat-list" class="chat-list">
+                <!-- Lista de chats -->
+            </ul>
+            <button id="logout-button" class="logout-button">Cerrar Sesión</button>
+        </div>
+        <div class="chat-window">
+            <div class="chat-header">
+                <span id="chat-user-name"></span>
+                <span id="chat-user-status" class="user-status"></span>
+            </div>
+            <div class="chat-messages">
+                <!-- Mensajes -->
+            </div>
+            <div class="chat-input">
+                <input id="message-input" placeholder="Aa" type="text"/>
+                <i class="fas fa-thumbs-up"></i>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+
+        const searchInput = document.getElementById('search-input');
+        const chatList = document.getElementById('chat-list');
+        const messageInput = document.getElementById('message-input');
+        const chatMessages = document.querySelector('.chat-messages');
+        const logoutButton = document.getElementById('logout-button');
+        const chatUserName = document.getElementById('chat-user-name');
+        const chatUserStatus = document.getElementById('chat-user-status');
+
+        const openedChats = new Map(JSON.parse(localStorage.getItem('openedChats')) || []);
+        let currentChatUserId = null;
+
+        // Registrar el usuario en el servidor
+        const userId = parseInt(localStorage.getItem('userId'), 10);
+        if (!isNaN(userId)) {
+            socket.emit('register user', userId);
+        }
+
+        searchInput.addEventListener('input', () => {
+            const term = searchInput.value;
+            if (term) {
+                fetch(`/search-users?term=${term}`)
+                    .then(response => response.json())
+                    .then(users => {
+                        chatList.innerHTML = '';
+                        users.forEach(user => {
+                            const li = document.createElement('li');
+                            li.textContent = `${user.nombre} (${user.correo})`;
+                            li.dataset.userId = user.id;
+                            li.addEventListener('click', () => openChat(user.id, user.nombre));
+                            chatList.appendChild(li);
+                        });
+                    })
+                    .catch(error => console.error('Error:', error));
+            } else {
+                chatList.innerHTML = '';
+                openedChats.forEach((userName, userId) => {
+                    const li = document.createElement('li');
+                    li.textContent = userName;
+                    li.dataset.userId = userId;
+                    li.addEventListener('click', () => openChat(userId, userName));
+                    chatList.appendChild(li);
+                });
+            }
+        });
+
+        function openChat(userId, userName) {
+            if (!openedChats.has(userId)) {
+                const li = document.createElement('li');
+                li.textContent = userName;
+                li.dataset.userId = userId;
+                li.addEventListener('click', () => openChat(userId, userName));
+                chatList.appendChild(li);
+                openedChats.set(userId, userName);
+                localStorage.setItem('openedChats', JSON.stringify(Array.from(openedChats.entries())));
+            }
+
+            currentChatUserId = userId;
+
+            // Aquí puedes agregar la lógica para abrir el chat con el usuario seleccionado
+            chatMessages.innerHTML = ''; // Limpiar mensajes anteriores
+            chatUserName.textContent = userName; // Mostrar el nombre del usuario en el encabezado del chat
+
+            // Verificar el estado del usuario desde el servidor
+            fetch(`/user-status/${userId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const isActive = data.isActive;
+                    chatUserStatus.textContent = isActive ? 'Activo' : 'Inactivo';
+                    chatUserStatus.classList.toggle('active', isActive);
+                    chatUserStatus.classList.toggle('inactive', !isActive);
+                })
+                .catch(error => console.error('Error:', error));
+
+            // Cargar mensajes anteriores del usuario seleccionado
+            fetch(`/messages/${userId}/${userId}`)
+                .then(response => response.json())
+                .then(messages => {
+                    messages.forEach(msg => {
+                        const type = msg.remitente_id === userId ? 'sent' : 'received';
+                        displayMessage(msg.mensaje, type);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+
+            console.log(`Abriendo chat con el usuario ID: ${userId}`);
+        }
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const message = messageInput.value;
+                if (message && currentChatUserId) {
+                    socket.emit('private message', {
+                        senderId: userId,
+                        receiverId: currentChatUserId,
+                        message
+                    });
+                    displayMessage(message, 'sent');
+                    messageInput.value = '';
+                }
+            }
+        });
+
+        socket.on('private message', ({ senderId, message }) => {
+            if (senderId === currentChatUserId) {
+                displayMessage(message, 'received');
+            }
+        });
+
+        function displayMessage(message, type) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', type);
+            messageElement.textContent = message;
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        logoutButton.addEventListener('click', () => {
+            fetch('/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'Logout successful') {
+                    window.location.href = 'index.html';
+                } else {
+                    alert(data);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        // Inicializar la lista de chats abiertos al cargar la página
+        openedChats.forEach((userName, userId) => {
+            const li = document.createElement('li');
+            li.textContent = userName;
+            li.dataset.userId = userId;
+            li.addEventListener('click', () => openChat(userId, userName));
+            chatList.appendChild(li);
+        });
+    </script>
+</body>
+</html>

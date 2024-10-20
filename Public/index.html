@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Page</title>
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+    <header class="login-header">
+        <h1>Chat Universitario</h1>
+    </header>
+    <div class="left-side"></div>
+    <div class="right-side">
+        <div class="login-container">
+            <form id="login-form">
+                <input type="email" id="login-email" placeholder="Correo electrónico" required>
+                <input type="password" id="login-password" placeholder="Contraseña" required>
+                <button type="submit">Iniciar Sesión</button>
+            </form>
+            <hr>
+            <button class="create-account" onclick="window.location.href='registro.html'">Crear nueva cuenta</button>
+        </div>
+    </div>
+    <script>
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ correo: email, contrasena: password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.userId) {
+                    localStorage.setItem('userId', data.userId);
+                    window.location.href = 'messages.html';
+                } else {
+                    alert(data);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>

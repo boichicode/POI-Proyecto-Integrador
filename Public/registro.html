@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Usuario</title>
+    <link href="stylesregistro.css" rel="stylesheet">
+</head>
+<body>
+    <header class="login-header">
+        <h1>Chat Universitario</h1>
+    </header>
+    <div class="left-side"></div>
+    <div class="right-side">
+        <div class="login-container">
+            <form id="register-form">
+                <input type="text" id="register-name" placeholder="Nombre completo" required>
+                <input type="email" id="register-email" placeholder="Correo electrónico" required>
+                <input type="password" id="register-password" placeholder="Contraseña" required>
+                <input type="password" id="register-confirm-password" placeholder="Confirmar contraseña" required>
+                <button type="submit">Registrarse</button>
+            </form>
+            <a href="index.html">¿Ya tienes una cuenta? Inicia sesión</a>
+        </div>
+    </div>
+    <script>
+        document.getElementById('register-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const name = document.getElementById('register-name').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const confirmPassword = document.getElementById('register-confirm-password').value;
+
+            // Validación de campos
+            if (!name || !email || !password || !confirmPassword) {
+                alert('Todos los campos son obligatorios');
+                return;
+            }
+
+            // Validación de formato de correo electrónico
+            const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+            if (!emailPattern.test(email)) {
+                alert('Por favor, introduce un correo electrónico válido');
+                return;
+            }
+
+            // Validación de longitud de contraseña
+            if (password.length < 6) {
+                alert('La contraseña debe tener al menos 6 caracteres');
+                return;
+            }
+
+            // Validación de coincidencia de contraseñas
+            if (password !== confirmPassword) {
+                alert('Las contraseñas no coinciden');
+                return;
+            }
+
+            // Enviar datos al servidor
+            fetch('/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ nombre: name, correo: email, contrasena: password })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'User registered successfully') {
+                    alert('Registro exitoso');
+                    window.location.href = 'index.html';
+                } else {
+                    alert(data);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
